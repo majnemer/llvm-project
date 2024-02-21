@@ -1289,9 +1289,8 @@ def IntVRegInputMods : InputMods <IntVRegInputModsMatchClass> {
 
 class PackedFPInputModsMatchClass <int opSize> : AsmOperandClass {
   let Name = "PackedFP"#opSize#"InputMods";
-  let ParserMethod = "parseRegOrImm";
-  let PredicateMethod = "isRegOrImm";
-//  let PredicateMethod = "isPackedFP"#opSize#"InputMods";
+  let ParserMethod = "parseRegOrImmWithFPInputMods";
+  let PredicateMethod = "isPackedFP"#opSize#"InputMods";
 }
 
 class PackedIntInputModsMatchClass <int opSize> : AsmOperandClass {
@@ -1305,7 +1304,7 @@ def PackedF16InputModsMatchClass : PackedFPInputModsMatchClass<16>;
 def PackedI16InputModsMatchClass : PackedIntInputModsMatchClass<16>;
 
 class PackedFPInputMods <PackedFPInputModsMatchClass matchClass> : InputMods <matchClass> {
-//  let PrintMethod = "printPackedFPInputMods";
+  let PrintMethod = "printOperandAndFPInputMods";
 }
 
 class PackedIntInputMods <PackedIntInputModsMatchClass matchClass> : InputMods <matchClass> {
@@ -1499,11 +1498,11 @@ class getVOPSrc0ForVT<ValueType VT, bit IsTrue16, bit IsFake16 = 1> {
                               !if(IsFake16, VSrcFake16_f16_Lo128, VSrcT_f16_Lo128),
                               VSrc_f16),
         !eq(VT, bf16)   : !if(IsTrue16,
-                              !if(IsFake16, VSrcFake16_f16_Lo128, VSrcT_f16_Lo128),
-                              VSrc_f16),
+                              !if(IsFake16, VSrcFake16_bf16_Lo128, VSrcT_bf16_Lo128),
+                              VSrc_bf16),
         !eq(VT, v2i16)  : VSrc_v2b16,
         !eq(VT, v2f16)  : VSrc_v2f16,
-        !eq(VT, v2bf16) : VSrc_v2f16,
+        !eq(VT, v2bf16) : VSrc_v2bf16,
         !eq(VT, v4f16)  : AVSrc_64,
         !eq(VT, v4bf16) : AVSrc_64,
         1               : VSrc_b32);
@@ -1539,13 +1538,13 @@ class getVOP3SrcForVT<ValueType VT, bit IsTrue16 = 0> {
   !cond(!eq(VT, f64)      : VSrc_f64,
         !eq(VT, f32)      : VSrc_f32,
         !eq(VT, f16)      : !if(IsTrue16, VSrcT_f16, VSrc_f16),
-        !eq(VT, bf16)     : !if(IsTrue16, VSrcT_f16, VSrc_f16),
+        !eq(VT, bf16)     : !if(IsTrue16, VSrcT_bf16, VSrc_bf16),
         !eq(VT, i16)      : !if(IsTrue16, VSrcT_b16, VSrc_b16),
         !eq(VT, i1)       : SSrc_i1,
         !eq(VT, v2f32)    : VSrc_v2f32,
         !eq(VT, v2i32)    : VSrc_v2b32,
         !eq(VT, v2f16)    : VSrc_v2f16,
-        !eq(VT, v2bf16)   : VSrc_v2f16,
+        !eq(VT, v2bf16)   : VSrc_v2bf16,
         !eq(VT, v2i16)    : VSrc_v2b16,
         !eq(VT, v4f16)    : AVSrc_64,
         !eq(VT, v4bf16)   : AVSrc_64,
@@ -1561,10 +1560,10 @@ class getVOP3DPPSrcForVT<ValueType VT> {
   !cond(!eq(VT, i1)     : SSrc_i1,
         !eq(VT, i16)    : VCSrc_b16,
         !eq(VT, f16)    : VCSrc_f16,
-        !eq(VT, bf16)   : VCSrc_f16,
+        !eq(VT, bf16)   : VCSrc_bf16,
         !eq(VT, v2i16)  : VCSrc_v2b16,
         !eq(VT, v2f16)  : VCSrc_v2f16,
-        !eq(VT, v2bf16) : VCSrc_v2f16,
+        !eq(VT, v2bf16) : VCSrc_v2bf16,
         !eq(VT, f32)    : VCSrc_f32,
         1               : VCSrc_b32);
 }
@@ -1606,8 +1605,11 @@ class getSrcMod <ValueType VT, bit IsTrue16 = 0> {
 }
 
 class getOpSelMod <ValueType VT> {
-  Operand ret = !if(!or(!eq(VT.Value, f16.Value), !eq(VT.Value, bf16.Value)),
-                    FP16InputMods, IntOpSelMods);
+  Operand ret = !cond(!eq(VT, f16) : FP16InputMods,
+                      !eq(VT, bf16) : FP16InputMods,
+                      !eq(VT, v2f16) : PackedF16InputMods,
+                      !eq(VT, v2bf16) : PackedF16InputMods,
+                      1 : IntOpSelMods);
 }
 
 // Return type of input modifiers operand specified input operand for DPP
@@ -2493,8 +2495,8 @@ def VOP_V2I16_F32_F32 : VOPProfile <[v2i16, f32, f32, untyped]>;
 def VOP_V2I16_I32_I32 : VOPProfile <[v2i16, i32, i32, untyped]>;
 
 def VOP_F16_V2F16_V2F16_F16 : VOPProfile <[f16, v2f16, v2f16, f16]>;
-def VOP_I16_V2I16_V2I16_I16 : VOPProfile <[i16, v2i16, v2i16, i16]>;
-def VOP_F32_V2I16_V2I16_F32 : VOPProfile <[f32, v2i16, v2i16, f32]>;
+def VOP_BF16_V2BF16_V2BF16_BF16: VOPProfile <[bf16, v2bf16, v2bf16, bf16]>;
+def VOP_F32_V2BF16_V2BF16_F32 : VOPProfile <[f32, v2bf16, v2bf16, f32]>;
 
 def VOP_F32_V2F16_V2F16_V2F16 : VOPProfile <[f32, v2f16, v2f16, v2f16]>;
 
